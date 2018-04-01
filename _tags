@@ -1,3 +1,5 @@
+true: annot, bin_annot, safe_string
+
 "src": include
 
 <src/widget.*> or <src/ui.*>: syntax(camlp4o), package(lwt.syntax)

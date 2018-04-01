@@ -1,6 +1,6 @@
 open Astring
 
-type styler = 
+type styler =
   {
     start : (string -> unit) -> unit;
     set : (string -> unit) -> Gfx.Style.t -> unit;
@@ -8,7 +8,7 @@ type styler =
     finish : (string -> unit) -> unit;
   }
 
-let no_styler = 
+let no_styler =
   {
     start = (fun _ -> ());
     set = (fun _ _ -> ());
@@ -26,44 +26,44 @@ let int_of_colour = function
   | Black -> 0 | Red -> 1 | Green -> 2 | Yellow -> 3
   | Blue -> 4 | Magenta -> 5 | Cyan -> 6 | White -> 7
 
-let html_styler = 
+let html_styler =
   let prev = ref default in
-  let set_style style os = 
+  let set_style style os =
     os (Printf.sprintf "<span style=\"background-color:%s; color:%s; font-wieght:%s\">"
-      (str_of_colour style.bg) (str_of_colour style.fg) 
+      (str_of_colour style.bg) (str_of_colour style.fg)
       (if style.bold then "bold" else "normal"))
   in
   let close_style os = os "</span>" in
-  { 
+  {
     start = (fun os -> prev := default; set_style default os);
-    set = (fun os style -> 
-      if style <> !prev then begin 
-        prev := style; close_style os; set_style style os 
-      end); 
+    set = (fun os style ->
+      if style <> !prev then begin
+        prev := style; close_style os; set_style style os
+      end);
     eol = (fun _ -> ());
     finish = close_style;
   }
 
-let css_class_styler = 
+let css_class_styler =
   let prev = ref default in
-  let set_style style os = 
+  let set_style style os =
     os (Printf.sprintf "<span class=\"w%i%i%s\">"
-      (int_of_colour style.bg) (int_of_colour style.fg) 
+      (int_of_colour style.bg) (int_of_colour style.fg)
       (if style.bold then "b" else ""))
   in
   let close_style os = os "</span>" in
-  { 
+  {
     start = (fun os -> prev := default; set_style default os);
-    set = (fun os style -> 
-      if style <> !prev then begin 
-        prev := style; close_style os; set_style style os 
-      end); 
+    set = (fun os style ->
+      if style <> !prev then begin
+        prev := style; close_style os; set_style style os
+      end);
     eol = (fun _ -> ());
     finish = close_style;
   }
 
-let css_classes = 
-  let css fg bg b = 
+let css_classes =
+  let css fg bg b =
     Printf.sprintf ".w%i%i%s { background-color:%s; color:%s; font-wieght:%s; }"
       (int_of_colour bg) (int_of_colour fg) (if b then "b" else "")
       (str_of_colour bg) (str_of_colour fg) (if b then "bold" else "normal")
@@ -72,28 +72,28 @@ let css_classes =
   let mapcat f = String.concat ~sep:"\n" (List.map f colours) in
   mapcat (fun fg -> mapcat (fun bg -> css fg bg false ^ "\n" ^ css fg bg true))
 
-let term_styler = 
+let term_styler =
   let prev = ref None in
-  let set_style style os = 
-    os (Printf.sprintf "\027[%i;%i%sm" 
-      (int_of_colour style.bg + 40) (int_of_colour style.fg + 30) 
+  let set_style style os =
+    os (Printf.sprintf "\027[%i;%i%sm"
+      (int_of_colour style.bg + 40) (int_of_colour style.fg + 30)
       (if style.bold then ";1" else ""))
   in
   let close_style os = os "\027[0m" in
-  { 
+  {
     start = (fun os -> prev := None);
-    set = 
-        (fun os style -> 
+    set =
+        (fun os style ->
           let set_style () = prev := Some style; set_style style os in
           match !prev with
           | Some(prev') when style <> prev' -> set_style ()
           | None -> set_style ()
-          | _ -> ()); 
+          | _ -> ());
     eol = (fun os -> prev := None; close_style os);
     finish = close_style;
   }
 
-let html_escape ?(styler=no_styler) os ctx = 
+let html_escape ?(styler=no_styler) os ctx =
   let open Gfx in
   let open In_memory in
   let bounds = Api.get_bounds ctx in
@@ -109,17 +109,17 @@ let html_escape ?(styler=no_styler) os ctx =
   done;
   styler.finish os
 
-let utf8 ?(styler=no_styler) os ctx = 
+let utf8 ?(styler=no_styler) os ctx =
   let open Gfx in
   let open In_memory in
-  let put c = 
-    if c <= 0x7f then begin os (Bytes.init 1 (fun _ -> Char.of_byte c))
+  let put c =
+    if c <= 0x7f then begin os (String.v ~len:1 (fun _ -> Char.of_byte c))
     end else if c <= 0x7FF then begin
-      os (Bytes.init 2 (function
+      os (String.v ~len:2 (function
         | 0 -> Char.of_byte ((c lsr 6) lor 0b11000000)
         | _ -> Char.of_byte ((c land 0b00111111) lor 0b10000000)))
     end else if c <= 0xFFFF then begin
-      os (Bytes.init 3 (function
+      os (String.v ~len:3 (function
         | 0 -> Char.of_byte ((c lsr 12) lor 0b11100000)
         | 1 -> Char.of_byte (((c lsr 6) land 0b00111111) lor 0b10000000)
         | _ -> Char.of_byte ((c land 0b00111111) lor 0b10000000)))
@@ -129,7 +129,7 @@ let utf8 ?(styler=no_styler) os ctx =
   let bounds = Api.get_bounds ctx in
   styler.start os;
   for r=0 to bounds.h-1 do
-    for c=0 to bounds.w-1 do 
+    for c=0 to bounds.w-1 do
       styler.set os (snd ctx.(r).(c));
       put (fst ctx.(r).(c))
     done;
@@ -137,4 +137,3 @@ let utf8 ?(styler=no_styler) os ctx =
     os "\n"
   done;
   styler.finish os
-
